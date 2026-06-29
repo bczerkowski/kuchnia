@@ -87,12 +87,18 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
         .where((e) => e.isNotEmpty)
         .toList();
 
-    // Baner zajmuje maks. ~40% wysokości — tytuł i składniki widać od razu.
-    final bannerH = (MediaQuery.of(context).size.height * 0.40).clamp(200.0, 360.0);
+    // Baner niski — tytuł i składniki widać od razu. Ograniczamy też jego
+    // wysokość bezwzględną, żeby na szerokim ekranie nie był olbrzymi.
+    final bannerH = (MediaQuery.of(context).size.height * 0.34).clamp(170.0, 280.0);
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
+      // Wyśrodkowana kolumna o stałej maks. szerokości: na komputerze wygląda
+      // jak aplikacja na telefonie, a nie rozciągnięty na całą szerokość pas.
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: CustomScrollView(
+            slivers: [
           SliverAppBar(
             expandedHeight: bannerH,
             pinned: true,
@@ -174,7 +180,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
