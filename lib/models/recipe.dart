@@ -4,8 +4,10 @@ class Recipe {
   final String id;
   String title;
   String category;
-  String ingredients; // składniki (wolny tekst, linia = pozycja)
+  String ingredients; // składniki (linia = jedna pozycja)
   String steps; // przygotowanie / przepis
+  String prepTime; // czas przygotowania, np. „15 min" (opcjonalny)
+  String servings; // liczba porcji, np. „4" (opcjonalna)
   String? imageBase64; // zdjęcie potrawy (opcjonalne)
   String? videoUrl; // link do rolki/filmu (opcjonalny)
   bool favorite;
@@ -17,6 +19,8 @@ class Recipe {
     required this.category,
     this.ingredients = '',
     this.steps = '',
+    this.prepTime = '',
+    this.servings = '',
     this.imageBase64,
     this.videoUrl,
     this.favorite = false,
@@ -29,6 +33,8 @@ class Recipe {
         'category': category,
         'ingredients': ingredients,
         'steps': steps,
+        'prepTime': prepTime,
+        'servings': servings,
         'imageBase64': imageBase64,
         'videoUrl': videoUrl,
         'favorite': favorite,
@@ -41,6 +47,8 @@ class Recipe {
         category: (map['category'] ?? '') as String,
         ingredients: (map['ingredients'] ?? '') as String,
         steps: (map['steps'] ?? '') as String,
+        prepTime: (map['prepTime'] ?? '') as String,
+        servings: (map['servings'] ?? '') as String,
         imageBase64: map['imageBase64'] as String?,
         videoUrl: map['videoUrl'] as String?,
         favorite: (map['favorite'] ?? false) as bool,

@@ -7,6 +7,7 @@ import '../data/store.dart';
 import '../models/recipe.dart';
 import '../theme.dart';
 import '../utils/image_tools.dart';
+import 'crop_screen.dart';
 
 class RecipeEditScreen extends StatefulWidget {
   final RecipeStore store;
@@ -20,9 +21,13 @@ class RecipeEditScreen extends StatefulWidget {
 class _RecipeEditScreenState extends State<RecipeEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
-  late final TextEditingController _ingredients;
   late final TextEditingController _steps;
   late final TextEditingController _video;
+  late final TextEditingController _prep;
+  late final TextEditingController _servings;
+
+  // Składniki jako lista pól — każda pozycja to osobny wiersz.
+  final List<TextEditingController> _ingredientCtrls = [];
 
   late String _category;
   String? _imageBase64;
@@ -37,12 +42,27 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     super.initState();
     final e = widget.existing;
     _title = TextEditingController(text: e?.title ?? '');
-    _ingredients = TextEditingController(text: e?.ingredients ?? '');
     _steps = TextEditingController(text: e?.steps ?? '');
     _video = TextEditingController(text: e?.videoUrl ?? '');
+    _prep = TextEditingController(text: e?.prepTime ?? '');
+    _servings = TextEditingController(text: e?.servings ?? '');
     _imageBase64 = e?.imageBase64;
     _category = e?.category ??
         (store.categories.isNotEmpty ? store.categories.first : 'Obiad');
+
+    // Zamień zapisany tekst składników na osobne wiersze.
+    final lines = (e?.ingredients ?? '')
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    for (final l in lines) {
+      _ingredientCtrls.add(TextEditingController(text: l));
+    }
+    if (_ingredientCtrls.isEmpty) {
+      _ingredientCtrls.add(TextEditingController());
+    }
+
     // Ctrl+V w dowolnym miejscu wklei zdjęcie ze schowka.
     attachPasteListener(_applyImageBytes);
   }
@@ -51,19 +71,32 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   void dispose() {
     detachPasteListener();
     _title.dispose();
-    _ingredients.dispose();
     _steps.dispose();
     _video.dispose();
+    _prep.dispose();
+    _servings.dispose();
+    for (final c in _ingredientCtrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  /// Wspólna ścieżka dla wyboru, wklejenia i upuszczenia obrazu:
-  /// zmniejsza zdjęcie i zapisuje jako base64.
+  /// Wspólna ścieżka dla wyboru i wklejenia obrazu: zmniejsza, otwiera
+  /// kadrowanie (4:3), a wynik zapisuje jako base64.
   Future<void> _applyImageBytes(Uint8List bytes) async {
     setState(() => _processing = true);
     try {
-      final small = await downscaleToBase64(bytes);
-      if (mounted) setState(() => _imageBase64 = small);
+      // Najpierw zmniejszamy (szybsze kadrowanie), potem dekodujemy do bajtów.
+      final smallB64 = await downscaleToBase64(bytes);
+      if (!mounted) return;
+      final toCrop = base64Decode(smallB64);
+      final cropped = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(builder: (_) => CropScreen(bytes: toCrop)),
+      );
+      if (!mounted) return;
+      final result = cropped ?? toCrop; // anulowanie kadru = bierz całość
+      final finalB64 = await downscaleToBase64(result, maxSide: 1280);
+      if (mounted) setState(() => _imageBase64 = finalB64);
     } catch (e) {
       if (mounted) _snack('Nie udało się przetworzyć zdjęcia.');
     } finally {
@@ -132,12 +165,18 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final e = widget.existing;
+    final ingredients = _ingredientCtrls
+        .map((c) => c.text.trim())
+        .where((t) => t.isNotEmpty)
+        .join('\n');
     final recipe = Recipe(
       id: e?.id ?? store.newId(),
       title: _title.text.trim(),
       category: _category,
-      ingredients: _ingredients.text.trim(),
+      ingredients: ingredients,
       steps: _steps.text.trim(),
+      prepTime: _prep.text.trim(),
+      servings: _servings.text.trim(),
       imageBase64: _imageBase64,
       videoUrl: _video.text.trim().isEmpty ? null : _video.text.trim(),
       favorite: e?.favorite ?? false,
@@ -145,6 +184,20 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     );
     await store.save(recipe);
     if (mounted) Navigator.pop(context);
+  }
+
+  void _addIngredient() {
+    setState(() => _ingredientCtrls.add(TextEditingController()));
+  }
+
+  void _removeIngredient(int i) {
+    setState(() {
+      _ingredientCtrls[i].dispose();
+      _ingredientCtrls.removeAt(i);
+      if (_ingredientCtrls.isEmpty) {
+        _ingredientCtrls.add(TextEditingController());
+      }
+    });
   }
 
   @override
@@ -156,7 +209,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             _photoPicker(),
             const SizedBox(height: 20),
@@ -167,6 +220,30 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
               decoration: const InputDecoration(hintText: 'np. Naleśniki babci'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Podaj nazwę przepisu' : null,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _miniField(
+                    label: 'Czas przygotowania',
+                    controller: _prep,
+                    hint: 'np. 15 min',
+                    icon: Icons.schedule,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _miniField(
+                    label: 'Liczba porcji',
+                    controller: _servings,
+                    hint: 'np. 4',
+                    icon: Icons.restaurant,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             _label('Kategoria'),
@@ -183,15 +260,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             ),
             const SizedBox(height: 20),
             _label('Składniki'),
-            TextFormField(
-              controller: _ingredients,
-              minLines: 3,
-              maxLines: 10,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                hintText: 'Każdy składnik w nowej linii:\n2 jajka\nszklanka mąki\n…',
-              ),
-            ),
+            _ingredientsList(),
             const SizedBox(height: 20),
             _label('Przygotowanie'),
             TextFormField(
@@ -203,23 +272,111 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                 hintText: 'Opisz krok po kroku, jak to zrobić…',
               ),
             ),
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.terracotta,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: _save,
-              icon: const Icon(Icons.check),
-              label: Text(_isNew ? 'Zapisz przepis' : 'Zapisz zmiany',
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-            ),
           ],
         ),
       ),
+      // Przyklejony pasek zapisu — zawsze widoczny na dole.
+      bottomNavigationBar: _saveBar(),
+    );
+  }
+
+  Widget _saveBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.cream,
+        border: Border(top: BorderSide(color: AppColors.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.terracotta,
+              minimumSize: const Size.fromHeight(54),
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            onPressed: _save,
+            icon: const Icon(Icons.check),
+            label: Text(_isNew ? 'Zapisz przepis' : 'Zapisz zmiany',
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _label(label),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, color: AppColors.muted, size: 20),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _ingredientsList() {
+    return Column(
+      children: [
+        for (int i = 0; i < _ingredientCtrls.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(right: 10),
+                  child: Icon(Icons.check_box_outline_blank,
+                      color: AppColors.olive, size: 22),
+                ),
+                Expanded(
+                  child: TextFormField(
+                    controller: _ingredientCtrls[i],
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) {
+                      if (i == _ingredientCtrls.length - 1) _addIngredient();
+                    },
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: 'np. 2 jajka',
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Usuń składnik',
+                  icon: const Icon(Icons.close, color: AppColors.muted),
+                  onPressed: () => _removeIngredient(i),
+                ),
+              ],
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _addIngredient,
+            style: TextButton.styleFrom(foregroundColor: AppColors.olive),
+            icon: const Icon(Icons.add),
+            label: const Text('Dodaj składnik',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ],
     );
   }
 

@@ -273,23 +273,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               searching
                   ? 'Spróbuj innego słowa albo kategorii.'
-                  : 'Dodaj pierwszy przepis ze zdjęciem i rolką wideo.',
+                  : 'Dodaj pierwszy przepis przyciskiem „Nowy przepis" w prawym dolnym rogu.',
               style: const TextStyle(color: AppColors.muted, fontSize: 15),
               textAlign: TextAlign.center,
             ),
-            if (!searching) ...[
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.terracotta,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                ),
-                onPressed: () => _openEditor(),
-                icon: const Icon(Icons.add),
-                label: const Text('Dodaj pierwszy przepis'),
-              ),
-            ],
           ],
         ),
       ),
