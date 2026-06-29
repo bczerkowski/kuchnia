@@ -87,83 +87,156 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
         .where((e) => e.isNotEmpty)
         .toList();
 
+    // Baner zajmuje maks. ~40% wysokości — tytuł i składniki widać od razu.
+    final bannerH = (MediaQuery.of(context).size.height * 0.40).clamp(200.0, 360.0);
+
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          IconButton(
-            tooltip: r.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych',
-            icon: Icon(r.favorite ? Icons.favorite : Icons.favorite_border,
-                color: r.favorite ? AppColors.terracotta : AppColors.brown),
-            onPressed: () async {
-              await store.toggleFavorite(r);
-              setState(() {});
-            },
-          ),
-          IconButton(
-            tooltip: 'Edytuj',
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              await Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => RecipeEditScreen(store: store, existing: r),
-              ));
-              if (mounted) setState(() {});
-            },
-          ),
-          IconButton(
-            tooltip: 'Usuń',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _confirmDelete(r),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 60),
-        children: [
-          _headerImage(r),
-          const SizedBox(height: 18),
-          _categoryPill(r.category),
-          const SizedBox(height: 12),
-          Text(r.title, style: AppTheme.heading(30)),
-          if (r.prepTime.trim().isNotEmpty || r.servings.trim().isNotEmpty) ...[
-            const SizedBox(height: 14),
-            _infoRow(r),
-          ],
-          const SizedBox(height: 18),
-          if (r.videoUrl != null && r.videoUrl!.trim().isNotEmpty)
-            _videoButton(r.videoUrl!.trim()),
-          if (ingredients.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _ingredientsSection(ingredients),
-          ],
-          if (r.steps.trim().isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _stepsSection(r.steps),
-          ],
-          if (ingredients.isEmpty && r.steps.trim().isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text('Brak treści przepisu — dodaj ją przyciskiem ✎.',
-                  style: TextStyle(color: AppColors.muted)),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: bannerH,
+            pinned: true,
+            stretch: true,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: AppColors.terracotta,
+            automaticallyImplyLeading: false,
+            leadingWidth: 64,
+            leading: _navBtn(
+              Icons.arrow_back,
+              tooltip: 'Wstecz',
+              onTap: () => Navigator.pop(context),
             ),
+            actions: [
+              _navBtn(
+                r.favorite ? Icons.favorite : Icons.favorite_border,
+                tooltip: r.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych',
+                iconColor: r.favorite ? const Color(0xFFFF6B5A) : Colors.white,
+                onTap: () async {
+                  await store.toggleFavorite(r);
+                  setState(() {});
+                },
+              ),
+              _navBtn(
+                Icons.edit,
+                tooltip: 'Edytuj',
+                onTap: () async {
+                  await Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => RecipeEditScreen(store: store, existing: r),
+                  ));
+                  if (mounted) setState(() {});
+                },
+              ),
+              _navBtn(
+                Icons.delete_outline,
+                tooltip: 'Usuń',
+                onTap: () => _confirmDelete(r),
+              ),
+              const SizedBox(width: 6),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.parallax,
+              background: _bannerImage(r),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 60),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _categoryPill(r.category),
+                  const SizedBox(height: 12),
+                  Text(r.title, style: AppTheme.heading(30)),
+                  if (r.prepTime.trim().isNotEmpty ||
+                      r.servings.trim().isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _infoRow(r),
+                  ],
+                  const SizedBox(height: 18),
+                  if (r.videoUrl != null && r.videoUrl!.trim().isNotEmpty)
+                    _videoButton(r.videoUrl!.trim()),
+                  if (ingredients.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _ingredientsSection(ingredients),
+                  ],
+                  if (r.steps.trim().isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _stepsSection(r.steps),
+                  ],
+                  if (ingredients.isEmpty && r.steps.trim().isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text('Brak treści przepisu — dodaj ją przyciskiem ✎.',
+                          style: TextStyle(color: AppColors.muted)),
+                    ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _headerImage(Recipe r) {
+  /// Okrągły przycisk nawigacji nakładany na zdjęcie — duży cel dotykowy,
+  /// białą ikonę na półprzezroczystym ciemnym kółku widać na każdym tle.
+  Widget _navBtn(
+    IconData icon, {
+    required VoidCallback onTap,
+    String? tooltip,
+    Color? iconColor,
+  }) {
+    final btn = Padding(
+      padding: const EdgeInsets.all(6),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.34),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(11), // 22 + 22 = ~44 px celu dotyku
+            child: Icon(icon, size: 22, color: iconColor ?? Colors.white),
+          ),
+        ),
+      ),
+    );
+    return tooltip == null ? btn : Tooltip(message: tooltip, child: btn);
+  }
+
+  Widget _bannerImage(Recipe r) {
     Widget inner;
     if (r.imageBase64 != null && r.imageBase64!.isNotEmpty) {
       try {
-        inner = Image.memory(base64Decode(r.imageBase64!), fit: BoxFit.cover);
+        inner = Image.memory(
+          base64Decode(r.imageBase64!),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+        );
       } catch (_) {
         inner = _photoFallback();
       }
     } else {
       inner = _photoFallback();
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: AspectRatio(aspectRatio: 4 / 3, child: inner),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Ciepłe ciemne tło — gdyby zdjęcia brakowało albo było wąskie.
+        Container(color: const Color(0xFF2A211C), child: inner),
+        // Subtelne przyciemnienie u góry, żeby przyciski były czytelne.
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment(0, -0.25),
+              colors: [Color(0x66000000), Color(0x00000000)],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
