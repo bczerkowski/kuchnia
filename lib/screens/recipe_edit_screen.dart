@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/store.dart';
 import '../models/recipe.dart';
 import '../theme.dart';
+import '../utils/image_tools.dart';
 
 class RecipeEditScreen extends StatefulWidget {
   final RecipeStore store;
@@ -29,6 +30,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   RecipeStore get store => widget.store;
   bool get _isNew => widget.existing == null;
 
+  bool _processing = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,10 +43,13 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     _imageBase64 = e?.imageBase64;
     _category = e?.category ??
         (store.categories.isNotEmpty ? store.categories.first : 'Obiad');
+    // Ctrl+V w dowolnym miejscu wklei zdjęcie ze schowka.
+    attachPasteListener(_applyImageBytes);
   }
 
   @override
   void dispose() {
+    detachPasteListener();
     _title.dispose();
     _ingredients.dispose();
     _steps.dispose();
@@ -51,24 +57,45 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     super.dispose();
   }
 
+  /// Wspólna ścieżka dla wyboru, wklejenia i upuszczenia obrazu:
+  /// zmniejsza zdjęcie i zapisuje jako base64.
+  Future<void> _applyImageBytes(Uint8List bytes) async {
+    setState(() => _processing = true);
+    try {
+      final small = await downscaleToBase64(bytes);
+      if (mounted) setState(() => _imageBase64 = small);
+    } catch (e) {
+      if (mounted) _snack('Nie udało się przetworzyć zdjęcia.');
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
-      final file = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1400,
-        imageQuality: 82,
-      );
+      final file = await picker.pickImage(source: ImageSource.gallery);
       if (file == null) return;
       final Uint8List bytes = await file.readAsBytes();
-      setState(() => _imageBase64 = base64Encode(bytes));
+      await _applyImageBytes(bytes);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Nie udało się wczytać zdjęcia: $e')),
-        );
-      }
+      if (mounted) _snack('Nie udało się wczytać zdjęcia.');
     }
+  }
+
+  Future<void> _pasteImage() async {
+    final bytes = await readClipboardImageBytes();
+    if (bytes == null) {
+      if (mounted) {
+        _snack('Brak obrazu w schowku. Skopiuj zdjęcie i spróbuj ponownie.');
+      }
+      return;
+    }
+    await _applyImageBytes(bytes);
   }
 
   Future<void> _addCategoryDialog() async {
@@ -205,76 +232,97 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
 
   Widget _photoPicker() {
     final hasImage = _imageBase64 != null && _imageBase64!.isNotEmpty;
-    return GestureDetector(
-      onTap: _pickImage,
-      child: Container(
-        height: 220,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3E7D6),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.line),
-          image: hasImage
-              ? DecorationImage(
-                  image: MemoryImage(base64Decode(_imageBase64!)),
-                  fit: BoxFit.cover,
-                )
-              : null,
-        ),
-        child: hasImage
-            ? Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _imgButton(Icons.edit, 'Zmień', _pickImage),
-                      const SizedBox(width: 8),
-                      _imgButton(Icons.delete_outline, 'Usuń',
-                          () => setState(() => _imageBase64 = null)),
-                    ],
-                  ),
-                ),
-              )
-            : const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_a_photo_outlined,
-                      size: 40, color: AppColors.honey),
-                  SizedBox(height: 10),
-                  Text('Dodaj zdjęcie potrawy',
-                      style: TextStyle(
-                          color: AppColors.muted, fontWeight: FontWeight.w600)),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _imgButton(IconData icon, String label, VoidCallback onTap) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: Colors.white),
-              const SizedBox(width: 5),
-              Text(label,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          onTap: hasImage ? null : _pickImage,
+          child: Container(
+            height: 230,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3E7D6),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.line),
+              image: hasImage
+                  ? DecorationImage(
+                      image: MemoryImage(base64Decode(_imageBase64!)),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: _processing
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.terracotta))
+                : (hasImage
+                    ? null
+                    : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_a_photo_outlined,
+                              size: 44, color: AppColors.honey),
+                          SizedBox(height: 10),
+                          Text('Dodaj zdjęcie potrawy',
+                              style: TextStyle(
+                                  color: AppColors.muted,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16)),
+                          SizedBox(height: 4),
+                          Text('wybierz plik albo wklej Ctrl+V',
+                              style: TextStyle(
+                                  color: AppColors.muted, fontSize: 13)),
+                        ],
+                      )),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.brown,
+                  side: const BorderSide(color: AppColors.line),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: _processing ? null : _pickImage,
+                icon: const Icon(Icons.photo_library_outlined, size: 20),
+                label: Text(hasImage ? 'Zmień' : 'Wybierz'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.olive,
+                  side: const BorderSide(color: AppColors.line),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: _processing ? null : _pasteImage,
+                icon: const Icon(Icons.content_paste, size: 20),
+                label: const Text('Wklej (Ctrl+V)'),
+              ),
+            ),
+            if (hasImage) ...[
+              const SizedBox(width: 10),
+              IconButton(
+                tooltip: 'Usuń zdjęcie',
+                style: IconButton.styleFrom(
+                  foregroundColor: AppColors.terracotta,
+                  side: const BorderSide(color: AppColors.line),
+                  padding: const EdgeInsets.all(13),
+                ),
+                onPressed: () => setState(() => _imageBase64 = null),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 

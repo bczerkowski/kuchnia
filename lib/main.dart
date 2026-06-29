@@ -21,6 +21,15 @@ class KuchniaApp extends StatelessWidget {
       title: 'Moja Kuchnia',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
+      // Globalnie powiększone czcionki — żeby wszystko było większe i czytelniejsze.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final scaled = mq.textScaler.scale(1.0) * 1.18;
+        return MediaQuery(
+          data: mq.copyWith(textScaler: TextScaler.linear(scaled)),
+          child: child!,
+        );
+      },
       home: HomeScreen(store: store),
     );
   }
