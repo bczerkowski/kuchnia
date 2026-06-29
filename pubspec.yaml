@@ -1,0 +1,40 @@
+name: kuchnia
+description: "Przepisy — ciepła, prosta jak kuchnia aplikacja na Twoje przepisy."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Ciepła typografia (serif do nagłówków + przyjazny sans do treści).
+  google_fonts: ^6.2.1
+
+  # Lokalna baza w przeglądarce (IndexedDB) — przepisy zostają na urządzeniu.
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Dodawanie zdjęć z dysku / telefonu.
+  image_picker: ^1.1.2
+
+  # Otwieranie rolek (Instagram / YouTube / TikTok) w nowej karcie.
+  url_launcher: ^6.3.0
+
+  # Unikalne identyfikatory przepisów.
+  uuid: ^4.5.1
+
+  # Pobieranie / wczytywanie pliku kopii zapasowej w przeglądarce.
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
