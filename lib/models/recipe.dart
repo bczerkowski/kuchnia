@@ -8,7 +8,7 @@ class Recipe {
   String steps; // przygotowanie / przepis
   String prepTime; // czas przygotowania, np. „15 min" (opcjonalny)
   String servings; // liczba porcji, np. „4" (opcjonalna)
-  String? imageBase64; // zdjęcie potrawy (opcjonalne)
+  List<String> images; // zdjęcia potrawy (base64, pierwsze = okładka)
   String? videoUrl; // link do rolki/filmu (opcjonalny)
   bool favorite;
   int createdAt; // millis
@@ -21,11 +21,14 @@ class Recipe {
     this.steps = '',
     this.prepTime = '',
     this.servings = '',
-    this.imageBase64,
+    List<String>? images,
     this.videoUrl,
     this.favorite = false,
     required this.createdAt,
-  });
+  }) : images = images ?? <String>[];
+
+  /// Okładka = pierwsze zdjęcie (na kafelku i jako miniatura).
+  String? get cover => images.isNotEmpty ? images.first : null;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -35,7 +38,7 @@ class Recipe {
         'steps': steps,
         'prepTime': prepTime,
         'servings': servings,
-        'imageBase64': imageBase64,
+        'images': images,
         'videoUrl': videoUrl,
         'favorite': favorite,
         'createdAt': createdAt,
@@ -49,7 +52,12 @@ class Recipe {
         steps: (map['steps'] ?? '') as String,
         prepTime: (map['prepTime'] ?? '') as String,
         servings: (map['servings'] ?? '') as String,
-        imageBase64: map['imageBase64'] as String?,
+        images: (map['images'] as List?)?.map((e) => e as String).toList() ??
+            // Zgodność wstecz: pojedyncze stare zdjęcie.
+            ((map['imageBase64'] is String &&
+                    (map['imageBase64'] as String).isNotEmpty)
+                ? [map['imageBase64'] as String]
+                : <String>[]),
         videoUrl: map['videoUrl'] as String?,
         favorite: (map['favorite'] ?? false) as bool,
         createdAt: (map['createdAt'] ?? 0) as int,

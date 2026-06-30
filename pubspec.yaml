@@ -31,9 +31,6 @@ dependencies:
   # Pobieranie / wczytywanie pliku kopii zapasowej w przeglądarce.
   web: ^1.1.0
 
-  # Kadrowanie zdjęcia (pan/zoom), czysty Dart — działa na webie.
-  crop_your_image: ^2.0.0
-
   # Ekran nie gaśnie podczas gotowania (Screen Wake Lock API na webie).
   wakelock_plus: ^1.2.8
 

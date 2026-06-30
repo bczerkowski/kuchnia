@@ -25,6 +25,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   // Odhaczone składniki (tylko na czas gotowania, niezapisywane).
   final Set<int> _checked = {};
 
+  // Galeria zdjęć.
+  final _pageCtrl = PageController();
+  int _page = 0;
+
   @override
   void initState() {
     super.initState();
@@ -34,8 +38,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
 
   @override
   void dispose() {
+    _pageCtrl.dispose();
     WakelockPlus.disable().catchError((_) {});
     super.dispose();
+  }
+
+  void _goToPage(int t, int count) {
+    final i = t.clamp(0, count - 1);
+    _pageCtrl.animateToPage(i,
+        duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
   }
 
   Future<void> _openVideo(String url) async {
@@ -171,24 +182,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     );
   }
 
-  /// Zdjęcie jako estetyczna karta-miniatura: stałe proporcje 4:3, ograniczona
-  /// szerokość, wyśrodkowana, zaokrąglona, z delikatnym cieniem.
+  /// Galeria zdjęć: estetyczna karta 4:3 (wyśrodkowana, zaokrąglona, z cieniem)
+  /// z przeglądaniem wielu zdjęć — przesuwanie, strzałki, licznik i kropki.
   Widget _photoCard(Recipe r) {
-    Widget inner;
-    if (r.imageBase64 != null && r.imageBase64!.isNotEmpty) {
-      try {
-        inner = Image.memory(
-          base64Decode(r.imageBase64!),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-        );
-      } catch (_) {
-        inner = _photoFallback();
-      }
-    } else {
-      inner = _photoFallback();
-    }
+    final images = r.images;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
@@ -205,7 +202,122 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: AspectRatio(aspectRatio: 4 / 3, child: inner),
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: images.isEmpty
+                  ? _photoFallback()
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        PageView.builder(
+                          controller: _pageCtrl,
+                          itemCount: images.length,
+                          onPageChanged: (i) => setState(() => _page = i),
+                          itemBuilder: (_, i) => Image.memory(
+                            base64Decode(images[i]),
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                            errorBuilder: (_, _, _) => _photoFallback(),
+                          ),
+                        ),
+                        if (images.length > 1) ..._galleryControls(images.length),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _galleryControls(int count) {
+    return [
+      // Licznik „1 / N".
+      Positioned(
+        top: 12,
+        right: 12,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.photo_library_rounded,
+                size: 14, color: Colors.white),
+            const SizedBox(width: 5),
+            Text('${_page + 1} / $count',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      ),
+      // Strzałki (działają też myszą na desktopie).
+      Positioned(
+        left: 8,
+        top: 0,
+        bottom: 0,
+        child: Center(
+          child: _arrow(Icons.chevron_left_rounded, _page > 0,
+              () => _goToPage(_page - 1, count)),
+        ),
+      ),
+      Positioned(
+        right: 8,
+        top: 0,
+        bottom: 0,
+        child: Center(
+          child: _arrow(Icons.chevron_right_rounded, _page < count - 1,
+              () => _goToPage(_page + 1, count)),
+        ),
+      ),
+      // Klikalne kropki.
+      Positioned(
+        bottom: 12,
+        left: 0,
+        right: 0,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            count,
+            (i) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _goToPage(i, count),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+                width: i == _page ? 22 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: i == _page ? Colors.white : Colors.white60,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _arrow(IconData icon, bool enabled, VoidCallback onTap) {
+    return AnimatedOpacity(
+      opacity: enabled ? 1 : 0,
+      duration: const Duration(milliseconds: 200),
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.4),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(icon, color: Colors.white, size: 26),
+            ),
           ),
         ),
       ),

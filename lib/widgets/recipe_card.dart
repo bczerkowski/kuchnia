@@ -58,6 +58,15 @@ class RecipeCard extends StatelessWidget {
                           left: 8,
                           child: _Badge(icon: Icons.videocam_rounded, text: 'Rolka'),
                         ),
+                      // Znaczek liczby zdjęć
+                      if (recipe.images.length > 1)
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: _Badge(
+                              icon: Icons.photo_library_rounded,
+                              text: '${recipe.images.length}'),
+                        ),
                     ],
                   ),
                 ),
@@ -122,10 +131,11 @@ class _Photo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (recipe.imageBase64 != null && recipe.imageBase64!.isNotEmpty) {
+    final cover = recipe.cover;
+    if (cover != null && cover.isNotEmpty) {
       try {
         return Image.memory(
-          base64Decode(recipe.imageBase64!),
+          base64Decode(cover),
           fit: BoxFit.cover,
           gaplessPlayback: true,
         );
