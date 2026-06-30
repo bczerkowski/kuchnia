@@ -37,6 +37,9 @@ dependencies:
   # Ekran nie gaśnie podczas gotowania (Screen Wake Lock API na webie).
   wakelock_plus: ^1.2.8
 
+  # Synchronizacja w chmurze po zwykłym HTTP (Supabase, bez wtyczek startowych).
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

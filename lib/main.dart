@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'data/store.dart';
 import 'screens/home_screen.dart';
+import 'services/sync_service.dart';
 import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = RecipeStore();
   await store.init();
+  // Odtwarza zapisaną sesję z Hive i startuje sync w tle (tylko jeśli zalogowano).
+  await sync.init(store);
   runApp(KuchniaApp(store: store));
 }
 

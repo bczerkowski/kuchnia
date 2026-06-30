@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../data/backup.dart';
 import '../data/store.dart';
 import '../models/recipe.dart';
+import '../services/sync_service.dart';
 import '../theme.dart';
 import '../widgets/recipe_card.dart';
 import 'recipe_detail_screen.dart';
 import 'recipe_edit_screen.dart';
+import 'sync_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final RecipeStore store;
@@ -139,6 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text('🍳', style: TextStyle(fontSize: 30)),
               const SizedBox(width: 10),
               Expanded(child: Text('Moja Kuchnia', style: AppTheme.heading(34))),
+              _syncButton(),
               _backupMenu(),
             ],
           ),
@@ -154,13 +157,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openSync() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => SyncScreen(store: store),
+    ));
+    if (mounted) setState(() {});
+  }
+
+  /// Ikona chmury w nagłówku — odzwierciedla stan synchronizacji i otwiera ekran.
+  Widget _syncButton() {
+    return AnimatedBuilder(
+      animation: sync,
+      builder: (context, _) {
+        IconData icon;
+        Color color;
+        switch (sync.state) {
+          case SyncState.syncing:
+            icon = Icons.cloud_sync_outlined;
+            color = AppColors.honey;
+          case SyncState.synced:
+            icon = Icons.cloud_done_outlined;
+            color = AppColors.olive;
+          case SyncState.error:
+            icon = Icons.cloud_off_outlined;
+            color = AppColors.terracotta;
+          case SyncState.offline:
+            icon = Icons.cloud_outlined;
+            color = AppColors.muted;
+        }
+        return IconButton(
+          tooltip: 'Synchronizacja',
+          icon: Icon(icon, color: color),
+          onPressed: _openSync,
+        );
+      },
+    );
+  }
+
   Widget _backupMenu() {
     return PopupMenuButton<String>(
-      tooltip: 'Kopia zapasowa',
+      tooltip: 'Więcej',
       icon: const Icon(Icons.more_vert, color: AppColors.brown),
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onSelected: (value) async {
+        if (value == 'sync') {
+          await _openSync();
+          return;
+        }
         if (value == 'export') {
           if (store.all.isEmpty) {
             _snack('Brak przepisów do zapisania.');
@@ -180,6 +224,14 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: 'sync',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.cloud_outlined, color: AppColors.olive),
+            title: Text('Synchronizacja (chmura)'),
+          ),
+        ),
         PopupMenuItem(
           value: 'export',
           child: ListTile(

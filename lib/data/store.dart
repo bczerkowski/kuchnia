@@ -19,20 +19,33 @@ const List<String> kDefaultCategories = [
 class RecipeStore extends ChangeNotifier {
   static const _recipesBox = 'recipes';
   static const _settingsBox = 'settings';
+  static const _metaBox = 'meta';
   static const _catKey = 'categories';
 
   final _uuid = const Uuid();
   late Box _recipes;
   late Box _settings;
+  late Box _meta;
 
   Future<void> init() async {
     await Hive.initFlutter();
     _recipes = await Hive.openBox(_recipesBox);
     _settings = await Hive.openBox(_settingsBox);
+    _meta = await Hive.openBox(_metaBox);
     if (_settings.get(_catKey) == null) {
       await _settings.put(_catKey, List<String>.from(kDefaultCategories));
     }
   }
+
+  int get count => _recipes.length;
+
+  // ---- Trwałe klucz–wartość (dla sync: sesja, znaczniki) ----
+  String? metaGetString(String key) => _meta.get(key) as String?;
+  bool? metaGetBool(String key) => _meta.get(key) as bool?;
+  int? metaGetInt(String key) => _meta.get(key) as int?;
+  Future<void> metaSet(String key, Object? value) async =>
+      value == null ? _meta.delete(key) : _meta.put(key, value);
+  Future<void> metaRemove(String key) async => _meta.delete(key);
 
   // ---- Kategorie ----
   List<String> get categories =>
@@ -95,6 +108,27 @@ class RecipeStore extends ChangeNotifier {
         'categories': categories,
         'recipes': all.map((r) => r.toMap()).toList(),
       };
+
+  /// Pełne zastąpienie zawartości danymi z chmury (sync). Lokalne przepisy
+  /// są nadpisywane dokładnie tym, co przyszło (łącznie z usunięciami).
+  Future<void> replaceFromMap(Map data) async {
+    await _recipes.clear();
+    final recs = data['recipes'];
+    if (recs is List) {
+      for (final m in recs) {
+        if (m is Map && m['id'] is String) {
+          final r = Recipe.fromMap(Map<String, dynamic>.from(m));
+          await _recipes.put(r.id, r.toMap());
+        }
+      }
+    }
+    final cats = data['categories'];
+    if (cats is List) {
+      final list = cats.whereType<String>().toList();
+      if (list.isNotEmpty) await _settings.put(_catKey, list);
+    }
+    notifyListeners();
+  }
 
   /// Wczytuje przepisy z kopii. Przepisy o tym samym id nadpisują istniejące,
   /// nowe są dopisywane. Zwraca liczbę wczytanych przepisów.
