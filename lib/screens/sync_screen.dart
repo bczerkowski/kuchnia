@@ -276,14 +276,40 @@ class _SyncScreenState extends State<SyncScreen> {
           style: TextStyle(color: AppColors.muted, height: 1.4, fontSize: 13.5),
         ),
         const SizedBox(height: 16),
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.line),
-            foregroundColor: AppColors.brown,
-          ),
-          onPressed: () => sync.pullNow(),
-          icon: const Icon(Icons.refresh, size: 18),
-          label: const Text('Synchronizuj teraz'),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.line),
+                  foregroundColor: AppColors.brown,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => sync.pullNow(),
+                icon: const Icon(Icons.cloud_download_outlined, size: 18),
+                label: const Text('Pobierz z chmury'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.line),
+                  foregroundColor: AppColors.olive,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => sync.pushNow(),
+                icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                label: const Text('Wyślij do chmury'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Zdjęcia nie pojawiły się na drugim urządzeniu? Na tym z kompletem '
+          'przepisów kliknij „Wyślij do chmury", a na drugim „Pobierz z chmury".',
+          style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4),
         ),
         const SizedBox(height: 8),
         TextButton.icon(

@@ -255,6 +255,19 @@ class SyncService extends ChangeNotifier {
     }
   }
 
+  /// Ręczne „Wyślij to urządzenie do chmury" — nadpisuje chmurę stanem lokalnym
+  /// (przydatne, gdy w chmurze jest starsza wersja, np. bez zdjęć).
+  Future<void> pushNow() async {
+    if (!signedIn) return;
+    _set(SyncState.syncing, 'Wysyłam…');
+    try {
+      await _push(force: true);
+      _set(SyncState.synced);
+    } catch (e) {
+      _set(SyncState.error, _friendly(e));
+    }
+  }
+
   // --- Nasłuch zmian ------------------------------------------------------
   void _listenLocal() {
     if (_listening) return;
