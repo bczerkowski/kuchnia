@@ -247,6 +247,15 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
           children: [
             _label('Zdjęcia'),
             _photoStrip(),
+            if (_images.length > 1)
+              const Padding(
+                padding: EdgeInsets.only(top: 6, left: 2),
+                child: Text(
+                  'Pierwsze zdjęcie to okładka. Stuknij „Okładka" na innym, '
+                  'aby ustawić je jako główne.',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ),
             const SizedBox(height: 20),
             _label('Nazwa potrawy'),
             TextFormField(
@@ -474,11 +483,42 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
               decoration: BoxDecoration(
                   color: AppColors.terracotta,
                   borderRadius: BorderRadius.circular(20)),
-              child: const Text('Okładka',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.star_rounded, size: 12, color: Colors.white),
+                SizedBox(width: 3),
+                Text('Okładka',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700)),
+              ]),
+            ),
+          )
+        else
+          // Na pozostałych zdjęciach: ustaw jako okładkę (przenosi na początek).
+          Positioned(
+            left: 6,
+            bottom: 6,
+            child: GestureDetector(
+              onTap: () => setState(() {
+                final img = _images.removeAt(i);
+                _images.insert(0, img);
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(20)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.star_outline_rounded, size: 12, color: Colors.white),
+                  SizedBox(width: 3),
+                  Text('Okładka',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700)),
+                ]),
+              ),
             ),
           ),
       ],
