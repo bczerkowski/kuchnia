@@ -172,6 +172,18 @@ class SyncService extends ChangeNotifier {
     );
   }
 
+  /// Tania kontrola: tylko znacznik czasu, nigdy całego (potencjalnie
+  /// wielomegabajtowego, ze zdjęciami) dokumentu. Pełny zbiór pobieramy dopiero,
+  /// gdy to pokaże, że chmura jest nowsza — inaczej co 15 s pobieralibyśmy
+  /// wszystkie zdjęcia od nowa (ogromny transfer / egress).
+  Future<DateTime?> _fetchCloudMeta() async {
+    await _ensureToken();
+    final list =
+        await _getJson('/rest/v1/${SupabaseConfig.table}?select=updated_at');
+    if (list is! List || list.isEmpty) return null;
+    return DateTime.parse((list.first as Map)['updated_at'] as String).toUtc();
+  }
+
   Future<void> _reconcile({required bool interactive}) async {
     final localCount = store.count;
     final cloud = await _fetchCloud();
@@ -294,11 +306,16 @@ class SyncService extends ChangeNotifier {
     _poll = Timer.periodic(const Duration(seconds: 15), (_) async {
       if (_applyingRemote || _state == SyncState.syncing) return;
       try {
-        final c = await _fetchCloud();
-        if (c.updatedAt != null &&
-            (_lastSyncedAt == null || c.updatedAt!.isAfter(_lastSyncedAt!))) {
-          await _applyRemote(c.data!, c.updatedAt!);
-          _set(SyncState.synced);
+        // Najpierw tania kontrola daty; pełne dane pobierz tylko, gdy chmura
+        // faktycznie się zmieniła.
+        final at = await _fetchCloudMeta();
+        if (at != null &&
+            (_lastSyncedAt == null || at.isAfter(_lastSyncedAt!))) {
+          final c = await _fetchCloud();
+          if (c.data != null) {
+            await _applyRemote(c.data!, c.updatedAt!);
+            _set(SyncState.synced);
+          }
         }
       } catch (_) {/* przejściowy problem sieci — zostaw stan */}
     });
