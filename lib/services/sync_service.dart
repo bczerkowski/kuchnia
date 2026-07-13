@@ -201,7 +201,7 @@ class SyncService extends ChangeNotifier {
         conflictResolver != null) {
       final keepCloud = await conflictResolver!(localCount);
       if (keepCloud) {
-        await _applyRemote(cloud.data!, cloud.updatedAt!);
+        await _applyRemote(cloud.data!, cloud.updatedAt!, force: true);
       } else {
         await _push(force: true);
       }
@@ -236,11 +236,41 @@ class SyncService extends ChangeNotifier {
     _set(SyncState.synced);
   }
 
-  Future<void> _applyRemote(String data, DateTime updatedAt) async {
+  Future<void> _applyRemote(String data, DateTime updatedAt,
+      {bool force = false}) async {
     if (data == _lastSyncedData) {
       _lastSyncedAt = updatedAt;
       await _writeLastAt(updatedAt);
       return;
+    }
+    // STRAŻNIK BEZPIECZEŃSTWA: nigdy nie pozwól, żeby wyraźnie mniejsza wersja
+    // z chmury po cichu skasowała większą lokalną (tak można stracić przepisy
+    // albo zdjęcia). Jeśli pobranie zabrałoby sporą część danych — zostaw
+    // lokalne i to je wypchnij jako źródło prawdy. Świadome akcje (pierwsze
+    // logowanie „użyj chmury") omijają strażnika przez force:true.
+    if (!force) {
+      final localCount = store.count;
+      final remoteCount = _recipeCount(data);
+      final lost = localCount - remoteCount;
+      final localImages = _localImageCount;
+      final remoteImages = _imageCount(data);
+      final lostImages = localImages - remoteImages;
+      final destructive = (remoteCount >= 0 &&
+              localCount > 0 &&
+              lost >= 2 &&
+              remoteCount < localCount * 0.75) ||
+          (remoteImages >= 0 &&
+              localImages > 0 &&
+              lostImages >= 2 &&
+              remoteImages < localImages * 0.75);
+      if (destructive) {
+        await _writeDirty(true);
+        await _push(force: true);
+        _set(SyncState.synced,
+            'Zachowano dane z tego urządzenia ($localCount przepisów, '
+            '$localImages zdjęć) — chmura miała mniej.');
+        return;
+      }
     }
     _applyingRemote = true;
     try {
@@ -251,6 +281,47 @@ class SyncService extends ChangeNotifier {
       await _writeDirty(false);
     } finally {
       _applyingRemote = false;
+    }
+  }
+
+  int get _localImageCount {
+    var n = 0;
+    for (final r in store.all) {
+      n += r.images.length;
+    }
+    return n;
+  }
+
+  int _recipeCount(String data) {
+    try {
+      final m = jsonDecode(data);
+      final r = (m is Map) ? m['recipes'] : null;
+      return r is List ? r.length : -1;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  int _imageCount(String data) {
+    try {
+      final m = jsonDecode(data);
+      final r = (m is Map) ? m['recipes'] : null;
+      if (r is! List) return -1;
+      var n = 0;
+      for (final e in r) {
+        if (e is Map) {
+          final imgs = e['images'];
+          if (imgs is List) {
+            n += imgs.length;
+          } else if (e['imageBase64'] is String &&
+              (e['imageBase64'] as String).isNotEmpty) {
+            n += 1;
+          }
+        }
+      }
+      return n;
+    } catch (_) {
+      return -1;
     }
   }
 

@@ -234,6 +234,23 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     });
   }
 
+  static final _optMarker =
+      RegExp(r'^\s*\(?\s*opcjonaln\w*\s*\)?\s*[:\-–]?\s*', caseSensitive: false);
+
+  /// Ręcznie oznacza/odznacza składnik jako opcjonalny (dodaje/usuwa marker).
+  void _toggleOptional(int i) {
+    final c = _ingredientCtrls[i];
+    final t = c.text.trim();
+    final isOpt = t.toLowerCase().contains('opcjonaln');
+    setState(() {
+      if (isOpt) {
+        c.text = t.replaceFirst(_optMarker, '').trim();
+      } else {
+        c.text = t.isEmpty ? '(opcjonalne) ' : '(opcjonalne) $t';
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -304,6 +321,11 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             ),
             const SizedBox(height: 20),
             _label('Składniki'),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8, left: 2),
+              child: Text('Stuknij ⭐ obok składnika, aby oznaczyć go jako opcjonalny.',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            ),
             _ingredientsList(),
             const SizedBox(height: 20),
             _label('Przygotowanie'),
@@ -383,19 +405,27 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: Icon(
-                    Icons.check_box_outline_blank,
-                    color: _ingredientCtrls[i]
-                            .text
-                            .toLowerCase()
-                            .contains('opcjonaln')
-                        ? AppColors.honey
-                        : AppColors.olive,
-                    size: 22,
-                  ),
-                ),
+                Builder(builder: (_) {
+                  final optional = _ingredientCtrls[i]
+                      .text
+                      .toLowerCase()
+                      .contains('opcjonaln');
+                  return IconButton(
+                    tooltip: optional
+                        ? 'Opcjonalny — stuknij, by był wymagany'
+                        : 'Oznacz jako opcjonalny',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    icon: Icon(
+                      optional ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: optional ? AppColors.honey : AppColors.muted,
+                      size: 24,
+                    ),
+                    onPressed: () => _toggleOptional(i),
+                  );
+                }),
+                const SizedBox(width: 4),
                 Expanded(
                   child: TextFormField(
                     controller: _ingredientCtrls[i],
@@ -407,7 +437,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                     },
                     decoration: const InputDecoration(
                       isDense: true,
-                      hintText: 'np. 2 jajka (albo „opcjonalnie …")',
+                      hintText: 'np. 2 jajka',
                     ),
                   ),
                 ),
