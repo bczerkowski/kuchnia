@@ -34,6 +34,42 @@
 
   <title>Moja Kuchnia</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Auto-aktualizacja: wykrywa nowy build (po sygnaturze service workera),
+    czyści pamięć podręczną i przeładowuje raz. Dzięki temu zainstalowana
+    apka (PWA) nie „zacina się" na starej wersji.
+  -->
+  <script>
+    (function () {
+      try {
+        if (!('serviceWorker' in navigator) || !window.caches) return;
+        var KEY = 'kuchnia_sw_sig';
+        fetch('flutter_service_worker.js?ts=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.text(); })
+          .then(function (txt) {
+            var sig = 0;
+            for (var i = 0; i < txt.length; i++) {
+              sig = (sig * 31 + txt.charCodeAt(i)) | 0;
+            }
+            sig = String(sig);
+            var prev = localStorage.getItem(KEY);
+            localStorage.setItem(KEY, sig);
+            if (prev && prev !== sig) {
+              Promise.all([
+                navigator.serviceWorker.getRegistrations().then(function (rs) {
+                  return Promise.all(rs.map(function (x) { return x.unregister(); }));
+                }),
+                caches.keys().then(function (ks) {
+                  return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+                })
+              ]).then(function () { location.reload(); });
+            }
+          })
+          .catch(function () {});
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <!--

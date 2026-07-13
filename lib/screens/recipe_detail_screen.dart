@@ -402,6 +402,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   Widget _ingredientsSection(List<String> lines) {
+    final anyOptional = lines.any(_isOptional);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -413,7 +414,17 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('🧺  Składniki', style: AppTheme.heading(20)),
+          Row(
+            children: [
+              Text('🧺  Składniki', style: AppTheme.heading(20)),
+              if (anyOptional) ...[
+                const Spacer(),
+                _legendDot(AppColors.olive, 'wymagane'),
+                const SizedBox(width: 10),
+                _legendDot(AppColors.honey, 'opcjonalne'),
+              ],
+            ],
+          ),
           const SizedBox(height: 6),
           for (int i = 0; i < lines.length; i++) _ingredientTile(i, lines[i]),
         ],
@@ -421,8 +432,41 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     );
   }
 
-  Widget _ingredientTile(int i, String text) {
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+      ],
+    );
+  }
+
+  static final _optLead =
+      RegExp(r'^\s*opcjonaln\w*\s*[:\-–]?\s*', caseSensitive: false);
+  static final _optParen =
+      RegExp(r'\s*\(\s*opcjonaln\w*\s*\)\s*', caseSensitive: false);
+
+  bool _isOptional(String s) => s.toLowerCase().contains('opcjonaln');
+
+  Widget _ingredientTile(int i, String raw) {
     final checked = _checked.contains(i);
+    final optional = _isOptional(raw);
+    final accent = optional ? AppColors.honey : AppColors.olive;
+
+    var text = raw;
+    if (optional) {
+      final cleaned =
+          raw.replaceFirst(_optLead, '').replaceAll(_optParen, ' ').trim();
+      if (cleaned.isNotEmpty) text = cleaned;
+    }
+
     return InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: () => setState(() {
@@ -439,7 +483,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
           children: [
             Icon(
               checked ? Icons.check_box : Icons.check_box_outline_blank,
-              color: checked ? AppColors.olive : AppColors.muted,
+              color: accent,
               size: 24,
             ),
             const SizedBox(width: 10),
@@ -455,6 +499,21 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                 ),
               ),
             ),
+            if (optional) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.honey.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('opcjonalne',
+                    style: TextStyle(
+                        color: Color(0xFFB07A1E),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
           ],
         ),
       ),

@@ -383,22 +383,31 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(right: 10),
-                  child: Icon(Icons.check_box_outline_blank,
-                      color: AppColors.olive, size: 22),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Icon(
+                    Icons.check_box_outline_blank,
+                    color: _ingredientCtrls[i]
+                            .text
+                            .toLowerCase()
+                            .contains('opcjonaln')
+                        ? AppColors.honey
+                        : AppColors.olive,
+                    size: 22,
+                  ),
                 ),
                 Expanded(
                   child: TextFormField(
                     controller: _ingredientCtrls[i],
                     textCapitalization: TextCapitalization.sentences,
                     textInputAction: TextInputAction.next,
+                    onChanged: (_) => setState(() {}),
                     onFieldSubmitted: (_) {
                       if (i == _ingredientCtrls.length - 1) _addIngredient();
                     },
                     decoration: const InputDecoration(
                       isDense: true,
-                      hintText: 'np. 2 jajka',
+                      hintText: 'np. 2 jajka (albo „opcjonalnie …")',
                     ),
                   ),
                 ),
