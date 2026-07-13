@@ -127,6 +127,8 @@ class _SyncScreenState extends State<SyncScreen> {
                     sync.signedIn ? _signedIn() : _signedOut(),
                     const SizedBox(height: 28),
                     _backupSection(),
+                    const SizedBox(height: 20),
+                    _localBackupsSection(),
                   ],
                 ),
               ),
@@ -374,6 +376,93 @@ class _SyncScreenState extends State<SyncScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _restoreBackup(int ts, int count) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Przywrócić tę kopię?'),
+        content: Text(
+            'Zastąpi bieżące przepisy wersją z $count ${_przepisow(count)} '
+            '(${_ago(DateTime.fromMillisecondsSinceEpoch(ts))}).\n\n'
+            'Bieżący stan i tak trafi najpierw do kopii, więc to odwracalne.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Anuluj')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.terracotta),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Przywróć'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await store.restoreBackup(ts);
+    if (mounted) {
+      setState(() {});
+      _toast('Przywrócono kopię ($count ${_przepisow(count)}).');
+    }
+  }
+
+  Widget _localBackupsSection() {
+    final list = store.backups();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history, color: AppColors.muted),
+              const SizedBox(width: 10),
+              Text('Kopie awaryjne (na tym urządzeniu)',
+                  style: AppTheme.heading(18)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Aplikacja sama zapisuje ostatnie stany przed każdą zmianą i przed '
+            'pobraniem z chmury. Gdyby coś zniknęło — przywróć jednym stuknięciem.',
+            style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          if (list.isEmpty)
+            const Text('Jeszcze nie ma kopii — pojawią się w miarę pracy.',
+                style: TextStyle(color: AppColors.muted, fontSize: 13))
+          else
+            ...list.map((b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.restore, size: 18, color: AppColors.olive),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${b.count} ${_przepisow(b.count)} · '
+                          '${_ago(DateTime.fromMillisecondsSinceEpoch(b.ts))}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      TextButton(
+                        style:
+                            TextButton.styleFrom(foregroundColor: AppColors.terracotta),
+                        onPressed: () => _restoreBackup(b.ts, b.count),
+                        child: const Text('Przywróć'),
+                      ),
+                    ],
+                  ),
+                )),
         ],
       ),
     );

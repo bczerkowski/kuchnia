@@ -188,7 +188,13 @@ class SyncService extends ChangeNotifier {
     final localCount = store.count;
     final cloud = await _fetchCloud();
     if (cloud.data == null) {
-      await _push(force: true); // zasiej chmurę z tego urządzenia
+      if (localCount > 0) await _push(force: true); // zasiej tylko, gdy mamy dane
+      return;
+    }
+    // Puste urządzenie: ZAWSZE przywróć z chmury i nigdy nie wypychaj pustki
+    // (chroni przed skasowaniem chmury po wyczyszczeniu pamięci / po migracji).
+    if (localCount == 0) {
+      await _applyRemote(cloud.data!, cloud.updatedAt!, force: true);
       return;
     }
     final last = _readLastAt();
