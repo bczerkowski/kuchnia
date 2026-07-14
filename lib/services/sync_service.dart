@@ -415,7 +415,7 @@ class SyncService extends ChangeNotifier {
           };
     final res = await http
         .post(_base.resolve(path), headers: headers, body: jsonEncode(body))
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 120));
     _ensureOk(res);
     if (res.body.isEmpty) return {};
     final decoded = jsonDecode(res.body);
@@ -425,7 +425,7 @@ class SyncService extends ChangeNotifier {
   Future<dynamic> _getJson(String path) async {
     final res = await http
         .get(_base.resolve(path), headers: _restHeaders)
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 120));
     _ensureOk(res);
     return res.body.isEmpty ? null : jsonDecode(res.body);
   }
